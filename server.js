@@ -1,6 +1,8 @@
 'use strict';
 
 const fs = require('fs');
+// require("@tensorflow/tfjs-node");
+const use = require("@tensorflow-models/universal-sentence-encoder");
 const express = require('express');
 const app = express();
 
@@ -19,33 +21,55 @@ if (!process.env.DISABLE_XORIGIN) {
 
 app.use('/public', express.static(process.cwd() + '/public'));
 
-app.route('/:coglangsentence').get(function(req, res, next) {
-  console.log('some kind of custom request', req.params.coglangsentence);
+app.route('/:coglangSentence').get(function(req, res, next) {
 
   // get request parameter data
-  var requestData = req.params.english;
-  requestData = requestData.toLowerCase();
-  requestData = requestData.replace(/  +/g,' '); // (multiple -> single) spaces
-  requestData = requestData.replace(/\?/g,' huh');
-  requestData = requestData.replace(/[-,.!;:"]/g,''); // replace punctuation (notably inus ' and ?)
-
+  let coglangSentence = req.params.coglangSentence;
+  console.log('some kind of custom request', coglangSentence);
+  coglangSentence = coglangSentence.toLowerCase();
+  coglangSentence = coglangSentence.replace(/  +/g,' ').trim();
+  
   // split into words
-  requestData = requestData.split(' ');
+  coglangSentence = coglangSentence.split(' ');
+  
+  // get just the ones marked as missing
+  const missingWords = coglangSentence.filter((word) => {
+    return word.startsWith('[') && word.endsWith(']');
+  }).map((word) => {
+    return word.replace('[', '').replace(']', '');
+  });
 
   // set up response data
-  var outputData = {long:[],short:[]};
+  const outputData = {
+    missingWord: [missingWords[0]],
+    suggestions: []
+  };
 
   // get dictionary before translate
-  fs.readFile('output_shortlist.txt', 'utf8', function (err,data) {
+  fs.readFile('embeddings.txt', 'utf8', async function (err,data) {
     if (err) {
       return console.log(err);
     }
-    // console.log(data);
-    var dictionary = createDictionary(data);
-
-    // go through each English word
-    for (var i in requestData) {
+    
+    const noMissingWords = missingWords.length === 0;
+    if (noMissingWords) {
+      res.type('json').send(outputData);
+      return; // exit early
     }
+    
+    // // TODO: go through each embedding
+    // for (let embedding of data) {
+    // }
+    
+    // TODO: just get closest match to first missing word
+    
+    // for now, just check closeness of match of first missing word with one word in the vocab
+    const similarityPercent = await useModel('hello', missingWords[0]);
+    console.log(8, similarityPercent)
+    
+    outputData.suggestions = similarityPercent || 0;
+    
+    console.log(outputData);
 
     // finally return JSON response
     res.type('json').send(outputData);
@@ -119,4 +143,61 @@ function getShortForm(cog) {
     }
   }
   return cog.slice(0,indexStopBefore);
+}
+
+
+
+// Tensorflow.js stuff:
+
+async function useModel(sentence1, sentence2) {
+  console.log(1, sentence1, sentence2);
+  // uses Universal Sentence Encoder (U.S.E.):
+  return await use.load().then(async (model) => {
+    console.log(2, 'inside use.load');
+    const similarityFraction = await embedSentences(model, sentence1, sentence2);
+    console.log(7, 'similarityFraction ' + similarityFraction)
+    return Math.round(similarityFraction * 100 * 100) / 100 + '%';
+  });
+}
+
+async function embedSentences(model, sentence1, sentence2) {
+  const sentences = [sentence1, sentence2];
+  return await model.embed(sentences).then(async (embeddings) => {
+    console.log(3, 'inside model.embed');
+    const embeds = await embeddings.arraySync();
+    console.log(4, 'did arraySync after got embeddings');
+    const sentence1Embedding = embeds[0];
+    const sentence2Embedding = embeds[1];
+    const similarityPercent = await getSimilarityPercent(sentence1Embedding, sentence2Embedding);
+    console.log(6, 'similarityPercent ' + similarityPercent);
+    return similarityPercent;
+  });
+}
+
+async function getSimilarityPercent(embed1, embed2) {
+  const similarity = await cosineSimilarity(embed1, embed2);
+  console.log(5, 'got similarity ' + similarity);
+  // cosine similarity -> % when doing text comparison, since cannot have -ve term frequencies: https://en.wikipedia.org/wiki/Cosine_similarity
+  return similarity;
+}
+
+async function cosineSimilarity(a, b) {
+  // https://towardsdatascience.com/how-to-build-a-textual-similarity-analysis-web-app-aa3139d4fb71
+
+  const magnitudeA = await Math.sqrt(dotProduct(a, a));
+  const magnitudeB = await Math.sqrt(dotProduct(b, b));
+  if (magnitudeA && magnitudeB) {
+    // https://towardsdatascience.com/how-to-measure-distances-in-machine-learning-13a396aa34ce
+    return await dotProduct(a, b) / (magnitudeA * magnitudeB);
+  } else {
+    return 0;
+  }
+}
+
+function dotProduct(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    sum += a[i] * b[i];
+  }
+  return sum;
 }
