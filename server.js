@@ -31,7 +31,7 @@ app.route('/:unknownWord').get(function(req, res, next) {
 
   // set up response data
   const outputData = {
-    missingWord: [unknownWord],
+    missingWord: unknownWord,
     suggestions: []
   };
 
