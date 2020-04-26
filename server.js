@@ -21,27 +21,17 @@ if (!process.env.DISABLE_XORIGIN) {
 
 app.use('/public', express.static(process.cwd() + '/public'));
 
-app.route('/:coglangSentence').get(function(req, res, next) {
+app.route('/:unknownWord').get(function(req, res, next) {
 
   // get request parameter data
-  let coglangSentence = req.params.coglangSentence;
-  console.log('some kind of custom request', coglangSentence);
-  coglangSentence = coglangSentence.toLowerCase();
-  coglangSentence = coglangSentence.replace(/  +/g,' ').trim();
-  
-  // split into words
-  coglangSentence = coglangSentence.split(' ');
-  
-  // get just the ones marked as missing
-  const missingWords = coglangSentence.filter((word) => {
-    return word.startsWith('[') && word.endsWith(']');
-  }).map((word) => {
-    return word.replace('[', '').replace(']', '');
-  });
+  let unknownWord = req.params.unknownWord;
+  console.log('some kind of custom unknown word', unknownWord);
+  unknownWord = unknownWord.toLowerCase();
+  unknownWord = unknownWord.replace(/ /g, '').replace(/\[/g, '').replace(/\]/g, '');
 
   // set up response data
   const outputData = {
-    missingWord: [missingWords[0]],
+    missingWord: [unknownWord],
     suggestions: []
   };
 
@@ -51,14 +41,13 @@ app.route('/:coglangSentence').get(function(req, res, next) {
       return console.log(err);
     }
     
-    const noMissingWords = missingWords.length === 0;
-    if (noMissingWords) {
+    if (!unknownWord) {
       res.type('json').send(outputData);
       return; // exit early
     }
     
-    // just get closest 5 matches to first missing word:
-    const mostSimilarWords = await useModel(missingWords[0]);
+    // just get closest 5 matches to the unknown word:
+    const mostSimilarWords = await useModel(unknownWord);
     
     outputData.suggestions = mostSimilarWords;
     
