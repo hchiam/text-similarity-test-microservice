@@ -9,3 +9,9 @@ For [text-similarity-test](https://github.com/hchiam/text-similarity-test) and [
 ## Example use
 
 <https://text-similarity-test-microservice.glitch.me/[hey]>
+
+## Related repos
+
+<https://github.com/hchiam/text-similarity-test>
+
+<https://github.com/hchiam/coglang-translator>
