@@ -15,3 +15,5 @@ For [text-similarity-test](https://github.com/hchiam/text-similarity-test) and [
 <https://github.com/hchiam/text-similarity-test>
 
 <https://github.com/hchiam/coglang-translator>
+
+<https://github.com/hchiam/cognateLanguage>
